@@ -10,6 +10,8 @@ var reqUtils = require('../lib/req-utils');
 var logger = require('../lib/loggers').getLogger();
 
 var Form = mongoose.model('Form');
+var ReleasedForm = mongoose.model('ReleasedForm');
+var FormContentRef = mongoose.model('FormContent');
 var Traveler = mongoose.model('Traveler');
 var Binder = mongoose.model('Binder');
 var TravelerData = mongoose.model('TravelerData');
@@ -207,6 +209,18 @@ module.exports = function(app) {
   app.get('/apis/forms/:id/', function(req, res) {
     Form.findById(req.params.id, function(err, forms) {
       performMongoResponse(err, forms, res);
+    });
+  });
+
+  app.get('/apis/forms/:id/released/', function(req, res) {
+    ReleasedForm.find({ 'base._id': req.params.id }).exec(function(err, forms) {
+      performMongoResponse(err, forms, res);
+    });
+  });
+
+  app.get('/apis/releasedForms/', function(req, res) {
+    ReleasedForm.find({}, function(err, releasedForms) {
+      performMongoResponse(err, releasedForms, res);
     });
   });
 
@@ -551,9 +565,10 @@ module.exports = function(app) {
 
   app.post(
     '/apis/update/traveler/:id/',
-    routesUtilities.filterBody(
+    routesUtilities.filterBodyWithOptional(
       ['userName', 'title', 'description', 'deadline', 'status'],
-      true
+      true,
+      ['devices']
     ),
     checkWritePermissions,
     function(req, res) {
@@ -584,6 +599,10 @@ module.exports = function(app) {
               traveler.description = req.body.description;
               traveler.updatedBy = req.body.userName;
               traveler.updatedOn = Date.now();
+              if (req.body.devices) {
+                traveler.devices = req.body.devices;
+              }
+
               traveler.save(function(err) {
                 performMongoResponse(err, traveler, res, function() {
                   return res.status(200).json(traveler);
@@ -604,7 +623,7 @@ module.exports = function(app) {
     ),
     checkWritePermissions,
     function(req, res) {
-      Form.findById(req.body.formId, function(formErr, form) {
+      ReleasedForm.findById(req.body.formId, function(formErr, form) {
         performMongoResponse(formErr, form, res, function() {
           var title = req.body.title;
           var userName = req.body.userName;

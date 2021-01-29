@@ -34,6 +34,7 @@ mongoose.connection.close();
 // Load MongoDB models
 require('./model/user.js');
 require('./model/form.js');
+require('./model/released-form.js');
 require('./model/traveler.js');
 require('./model/binder.js');
 require('./model/history.js');
@@ -159,6 +160,7 @@ require('./routes/binder')(app);
 require('./routes/report')(app);
 require('./routes/admin')(app);
 require('./routes/user')(app);
+require('./routes/group')(app);
 require('./routes/profile')(app);
 require('./routes/device')(app);
 require('./routes/ldaplogin')(app);

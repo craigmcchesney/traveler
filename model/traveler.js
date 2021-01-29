@@ -46,6 +46,11 @@ var user = new Schema({
 var logData = new Schema({
   name: String,
   value: Schema.Types.Mixed,
+  file: {
+    path: String,
+    encoding: String,
+    mimetype: String,
+  },
 });
 
 // a log is an array of log data collected in a form.
@@ -63,6 +68,7 @@ var log = new Schema({
  *         | 1.5 // complete request
  *         | 2 // completed
  *         | 3 // frozen
+ *         | 4 // archived
  */
 
 const statusMap = {
@@ -89,7 +95,7 @@ var stateTransition = [
   },
   {
     from: 2,
-    to: [4],
+    to: [4, 1],
   },
   {
     from: 3,
@@ -134,6 +140,8 @@ var traveler = new Schema({
   referenceForm: ObjectId,
   // global object if of the discrepancy form
   referenceDiscrepancyForm: ObjectId,
+  referenceReleasedForm: ObjectId,
+  referenceReleasedFormVer: String,
   forms: [form],
   discrepancyForms: [form],
   mapping: Schema.Types.Mixed,

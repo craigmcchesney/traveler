@@ -24,15 +24,27 @@ var mce_content = {
 
 var initHtml = '';
 
-function sendRequest(data, cb, saveas, status) {
+/**
+ * send request with data, and exec cb on response
+ *
+ * @param   {Object}  data    request body data
+ * @param   {function}  cb    callback
+ * @param   {string}  option  available options
+ *
+ * @return  {void}
+ */
+function sendRequest(data, cb, option) {
   var path = window.location.pathname;
   var url;
   var type;
-  if (saveas) {
+  if (option === 'saveas') {
     url = prefix + '/forms/';
     type = 'POST';
-  } else if (status) {
+  } else if (option === 'status') {
     url = path + 'status';
+    type = 'PUT';
+  } else if (option === 'release') {
+    url = path + 'released';
     type = 'PUT';
   } else {
     url = path;
@@ -47,20 +59,9 @@ function sendRequest(data, cb, saveas, status) {
     processData: false,
   })
     .done(function(data, textStatus, request) {
-      var location;
       var timestamp = request.getResponseHeader('Date');
-      if (saveas) {
-        location = request.getResponseHeader('Location');
-        $('#message').append(
-          '<div class="alert alert-success"><button class="close" data-dismiss="alert">x</button>A new form is created at <a href="' +
-            location +
-            '">' +
-            location +
-            '</a> ' +
-            livespan(timestamp) +
-            '.</div>'
-        );
-        $(window).scrollTop($('#message div:last-child').offset().top - 40);
+      if (data.location) {
+        document.location.href = data.location;
       } else {
         $('#message').append(
           '<div class="alert alert-success"><button class="close" data-dismiss="alert">x</button>The changes were saved ' +
@@ -91,25 +92,73 @@ function userkey_error($userkey, msg) {
 
 function updateSectionNumbers() {
   var sectionNumber = 0;
+  var instructionNumber = 0;
   var controlNumber = 0;
   // assign the sequence number to all legend
   $('#output')
-    .find('legend, .control-label')
-    .each(function(index) {
+    .find('legend, .control-label, .rich-instruction')
+    .each(function() {
       if ($(this).is('legend')) {
         sectionNumber += 1;
         // reset control number
         controlNumber = 0;
+        instructionNumber = 0;
         $(this)
           .find('.section-number')
           .text(sectionNumber);
+      } else if ($(this).is('div.rich-instruction')) {
+        instructionNumber += 1;
+        //reset control number
+        controlNumber = 0;
+
+        $(this)
+          .find('.rich-instruction-number')
+          .text('' + sectionNumber + '.' + instructionNumber);
       } else {
         controlNumber += 1;
         $(this)
           .find('.control-number')
-          .text('' + sectionNumber + '.' + controlNumber);
+          .text(
+            '' + sectionNumber + '.' + instructionNumber + '.' + controlNumber
+          );
       }
     });
+}
+
+function addSectionNumbers() {
+  $('#output')
+    .find('legend, .control-label, .tinymce')
+    .each(function() {
+      if ($(this).is('legend')) {
+        prependSpanIfNotExists(this, 'section-number');
+      } else if ($(this).is('div.tinymce')) {
+        var instructionParent = this.parentElement;
+        addSectionNumberToRichInstruction(instructionParent);
+      } else {
+        prependSpanIfNotExists(this, 'control-number');
+      }
+    });
+}
+
+function addSectionNumberToRichInstruction(richInstructionParent) {
+  if (richInstructionParent.className != 'rich-instruction') {
+    var tinymceChild = $(richInstructionParent).find('.tinymce')[0];
+    richInstructionParent.removeChild(tinymceChild);
+
+    var richInstructionDiv = document.createElement('div');
+    richInstructionDiv.className = 'rich-instruction';
+    richInstructionDiv.appendChild(tinymceChild);
+    richInstructionParent.appendChild(richInstructionDiv);
+    richInstructionParent = richInstructionDiv;
+  }
+
+  prependSpanIfNotExists(richInstructionParent, 'rich-instruction-number');
+}
+
+function prependSpanIfNotExists(element, sectionName) {
+  if ($(element).find('.' + sectionName).length === 0) {
+    $(element).prepend('<span class="' + sectionName + '"></span>&nbsp;');
+  }
 }
 
 function done_button(view, $out) {
@@ -884,21 +933,25 @@ function number_edit($cgr) {
 function file_edit($cgr) {
   $('#output .well.spec').remove();
   var label = 'label';
+  var required = false;
   var userkey = '';
   var help = '';
   if ($cgr) {
     label = $('.control-label span.model-label', $cgr).text();
+    required = $('input', $cgr).prop('required');
     userkey = $('.controls input', $cgr).data('userkey');
     help = $('.controls span.help-block', $cgr).text();
   }
 
   var $upload = $(input.upload());
   var $label = $(spec.label());
+  var $required = $(spec.required());
   var $userkey = $(spec.userkey());
   var $help = $(spec.help());
   var $done = $(spec.done());
   var $edit = $('<div class="well spec"></div>').append(
     $label,
+    $required,
     $userkey,
     $help,
     $done
@@ -916,11 +969,13 @@ function file_edit($cgr) {
 
   var model = {
     label: label,
+    required: required,
     userkey: userkey,
     help: help,
   };
 
   $('input', $label).val(label);
+  $('input', $required).prop('checked', required);
   $('input', $userkey).val(userkey);
   $('input', $help).val(help);
 
@@ -994,6 +1049,9 @@ function rich_edit($cgr) {
         .closest('.spec')
         .remove();
       $rich.closest('.control-group-wrap').removeAttr('data-status');
+      var resultParent = $rich[0];
+      addSectionNumberToRichInstruction(resultParent);
+      updateSectionNumbers();
     }
   });
 }
@@ -1036,55 +1094,70 @@ function init() {
   };
 }
 
+function scrollToBottom() {
+  var scrollingElement = document.scrollingElement || document.body;
+  scrollingElement.scrollTop = scrollingElement.scrollHeight;
+}
+
 function working() {
   $('#add-checkbox').click(function(e) {
     e.preventDefault();
     checkbox_edit();
+    scrollToBottom();
   });
 
   $('#add-radio').click(function(e) {
     e.preventDefault();
     radio_edit();
+    scrollToBottom();
   });
 
   $('#add-text').click(function(e) {
     e.preventDefault();
     text_edit();
+    scrollToBottom();
   });
 
   $('#add-figure').click(function(e) {
     e.preventDefault();
     figure_edit();
+    scrollToBottom();
   });
 
   $('#add-par').click(function(e) {
     e.preventDefault();
     textarea_edit();
+    scrollToBottom();
   });
 
   $('#add-number').click(function(e) {
     e.preventDefault();
     number_edit();
+    scrollToBottom();
   });
 
   $('#add-file').click(function(e) {
     e.preventDefault();
     file_edit();
+    scrollToBottom();
   });
 
   $('#add-rich').click(function(e) {
     e.preventDefault();
     rich_edit();
+    scrollToBottom();
   });
 
   $('#add-section').click(function(e) {
     e.preventDefault();
     section_edit();
+    scrollToBottom();
   });
 
   $('#add-other').click(function(e) {
     e.preventDefault();
     other_edit();
+    scrollToBottom();
   });
 }
 
@@ -1272,6 +1345,20 @@ function binding_events() {
     }
   });
 
+  $('#numbering').click(function(e) {
+    e.preventDefault();
+    if ($('#output .well.spec').length) {
+      modalAlert(
+        'Finish editing first',
+        'Please close all the opened edit area by clicking the "Done" button, and then generate the numbering if needed.'
+      );
+      return;
+    }
+    cleanBeforeSave();
+    addSectionNumbers();
+    updateSectionNumbers();
+  });
+
   $('#preview').click(function(e) {
     if ($('#output .well.spec').length) {
       e.preventDefault();
@@ -1304,14 +1391,14 @@ function binding_events() {
     $('#modalLabel').html('Save the form as (a new one)');
     $('#modal .modal-body').empty();
     $('#modal .modal-body').append(
-      '<form class="form-horizontal" id="modalform"><div class="control-group"><label class="control-label">Form title</label><div class="controls"><input id="title" type="text" class="input"></div></div></form>'
+      '<form class="form-horizontal" id="modalform"><div class="control-group"><label class="control-label">Form title</label><div class="controls"><input id="new-title" type="text" class="input"></div></div></form>'
     );
     $('#modal .modal-footer').html(
       '<button value="confirm" class="btn btn-primary" data-dismiss="modal">Confirm</button><button data-dismiss="modal" aria-hidden="true" class="btn">Cancel</button>'
     );
     $('#modal').modal('show');
     $('#modal button[value="confirm"]').click(function() {
-      var title = $('#title').val();
+      var title = $('#new-title').val();
       sendRequest(
         {
           html: html,
@@ -1319,7 +1406,7 @@ function binding_events() {
           formType: formType,
         },
         null,
-        true
+        'saveas'
       );
     });
   });
@@ -1351,23 +1438,77 @@ function binding_events() {
       function() {
         window.location.reload(true);
       },
-      false,
-      true
+      'status'
     );
   });
 
   $('#release').click(function() {
-    sendRequest(
-      {
-        status: 1,
-        version: Number($('#version').text()),
-      },
-      function() {
-        window.location.reload(true);
-      },
-      false,
-      true
+    var html = $('#output').html();
+    $('#modalLabel').html('Release the form');
+    $('#modal .modal-body').empty();
+    var defaultTitle = $('#formtitle').text();
+    $('#modal .modal-body').append(
+      '<form class="form-horizontal" id="modalform"> <div class="control-group"> <label class="control-label">Form title</label> <div class="controls"><input id="release-title" type="text" value="' +
+        defaultTitle +
+        '" class="input"> </div> </div> </form>'
     );
+    if (formType === 'normal') {
+      $('#modal .modal-body').append(
+        '<h4>Choose a discrepancy to attach</h4> <table id="discrepancy" class="table table-bordered table-hover"> </table>'
+      );
+      var discrepancyColumns = [
+        selectColumn,
+        titleColumn,
+        versionColumn,
+        releasedOnColumn,
+        releasedByColumn,
+        releasedFormLinkColumn,
+      ];
+      fnAddFilterFoot('#discrepancy', discrepancyColumns);
+      var discrepancyTable = $('#discrepancy').dataTable({
+        sAjaxSource: '/released-forms/discrepancy/json',
+        sAjaxDataProp: '',
+        bProcessing: true,
+        fnDrawCallback: function() {
+          Holder.run({
+            images: 'img.user',
+          });
+        },
+        oLanguage: {
+          sLoadingRecords: 'Please wait - loading data from the server ...',
+        },
+        aoColumns: discrepancyColumns,
+        iDisplayLength: 5,
+        aaSorting: [[3, 'desc']],
+        sDom: sDomPage,
+      });
+      selectOneEvent(discrepancyTable);
+      filterEvent();
+    }
+    $('#modal .modal-footer').html(
+      '<button value="confirm" class="btn btn-primary" data-dismiss="modal">Confirm</button><button data-dismiss="modal" aria-hidden="true" class="btn">Cancel</button>'
+    );
+    $('#modal').modal('show');
+    $('#modal button[value="confirm"]').click(function() {
+      var title = $('#release-title').val();
+      var json = {
+        title: title,
+      };
+      if (discrepancyTable) {
+        // get only current page after filtered
+        var selected = fnGetSelectedInPage(
+          discrepancyTable,
+          'row-selected',
+          true
+        );
+        if (selected.length === 1) {
+          var data = discrepancyTable.fnGetData(selected[0]);
+          json.discrepancyFormId = data._id;
+        }
+      }
+
+      sendRequest(json, null, 'release');
+    });
   });
 
   $('#reject').click(function() {
@@ -1379,8 +1520,7 @@ function binding_events() {
       function() {
         window.location.reload(true);
       },
-      false,
-      true
+      'status'
     );
   });
 
@@ -1393,8 +1533,7 @@ function binding_events() {
       function() {
         window.location.reload(true);
       },
-      false,
-      true
+      'status'
     );
   });
 }

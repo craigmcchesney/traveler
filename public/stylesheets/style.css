@@ -263,8 +263,13 @@ ul.dropdown-menu input[type='checkbox'] {
   box-shadow: 0 0 5px rgba(192, 152, 83, 1);
 }
 
-#form .invalid {
+form .invalid {
   outline: 1px solid #b94a48;
+}
+
+form .validation {
+  font-weight: bold;
+  color: #b94a48;
 }
 
 figcaption {
@@ -407,6 +412,13 @@ button.editable {
   margin-bottom: 5px;
 }
 
+.button-footer {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
 /**
  * Responsive
  */
@@ -530,4 +542,36 @@ button.editable {
     padding-top: 20px;
     padding-bottom: 20px;
   }
+}
+
+.section-number {
+  background: #ff9024;
+  color: white;
+  padding: 2px;
+  border: double;
+  border-color: white;
+  border-radius: 9px;
+}
+
+.control-number {
+  background: #66cc99;
+  color: white;
+  padding: 2px;
+  border: double;
+  border-color: white;
+  border-radius: 9px;
+}
+
+.rich-instruction {
+  display: flex;
+}
+
+.rich-instruction-number {
+  background: #0088cc;
+  color: white;
+  padding: 2px;
+  border: double;
+  border-color: white;
+  border-radius: 9px;
+  height: fit-content;
 }
